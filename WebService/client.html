@@ -1,0 +1,65 @@
+<html>
+	<head>
+		<title>通过Ajax调用服务</title>
+		<script type="text/javascript">
+		//创建发送请求的对象
+		var xhr;
+		if(window.XMLHttpRequest) {
+        //非IE浏览器(理论上是可行的,但是chrome并不可以,发送请求后服务端报异常)
+       	 	xhr = new XMLHttpRequest();
+    	}
+		else if(window.ActiveXObject){
+        //IE浏览器
+  			try{
+   				xhr = new ActiveXObject("MSXML2.XMLHTTP");
+  			}
+  			catch(e){
+   				xhr = new ActiveXObject("Microsoft.XMLHTTP");
+  			}
+ 		}
+		//alert(xhr);
+		function sendxhr(){
+			//服务的地址  
+			var url="http://192.168.8.120:7788/sayHello";
+			//请求体定义
+			var soap=
+				'<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"'
+				+' xmlns:q0="http://server.server.com/"'
+				+' xmlns:xsd="http://www.w3.org/2001/XMLSchema"'
+				+' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+					+'<soapenv:Body>'
+						+'<q0:sayHello>'
+ 							+'<arg0>'+ document.getElementById("request").value+'</arg0> '
+ 			 			+'</q0:sayHello>'
+  					+'</soapenv:Body>'
+  				+'</soapenv:Envelope>';
+  			//下面的格式还不了解暂时只能照抄,其实就是对xmlhttprequest的属性进行一些设置
+  			xhr.open('POST',url,true);             //建立连接
+			xhr.setRequestHeader("Content-Type","text/xml;charset=UTF-8"); //设置请求头的格式
+			xhr.onreadystatechange=_back;           //设置ajax请求完成后的回调方法
+			xhr.send(soap);                        //发送请求
+		}
+		//回调方法
+		function _back(){
+			if(xhr.readyState == 4){
+				if(xhr.status == 200){
+					//如果返回成功 则ret是一个document对象,里面的结果包含在name为return的节点里
+					//这里我们只要获取节点,获得内容就可以了
+					var ret=xhr.responseXML;
+					var rs=ret.getElementsByTagName("return")[0];
+					document.getElementById("response").innerText=rs.text;
+					alert(rs.text)
+				}
+			}
+		}
+		</script>
+	</head>
+	<body>
+	暂时只有用IE的xmlhttprequest有用,chrome还没有解决办法 会提示:<br/>
+	com.sun.xml.internal.ws.transport.http.server.WSHttpHandler handleExchange警告: Cannot handle HTTP method: OPTIONS
+		<br/>
+		<input type="text" id="request"/><br/>
+		<button onclick="sendxhr()">发送soap请求</button><br/>
+		返回内容:<div  id="response" style="width:100px;height:50px;border:1px solid black"></div>		
+	</body>
+</html>
