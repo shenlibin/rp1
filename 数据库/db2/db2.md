@@ -21,3 +21,5 @@
 <h5>执行存储过程sql文件</h5>
 	db2 -td@ -f  xxx.sql
 
+##### Sql 重构表格
+CALL SYSPROC.ADMIN_CMD('REORG TABLE CIF.EDRAFTPAYEE');
