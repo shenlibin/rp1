@@ -171,12 +171,55 @@ Major GC 的速度一般会比Minor GC 慢10倍以上，也会触发STW
 5.Minor GC时 对象转到老年代，对象大于老年代的可用内存（感觉和2重复了）
 
 ### 堆空间的分代思想
+为了提高效率,不用每次GC都对所有对象进行判断,优先对新对象判断是否需要释放
 
 ### 内存分配策略
+针对不同年龄段的对象分配原则  
+#### 优先分配到Eden
+#### 大对象直接分配到老年代
+#### 尽量避免程序中出现过多的大对象  
+长期存活的对象分配到老年代  
+#### 动态对象年龄判断  
+如果survivor区中相同年龄的所有对象大小的总和,大于survivor空间的一半,
+年龄大于或等于该年龄的对象可以进入老年代,无须等到触发MaxTenuringThreshold要求的年龄
+#### 空间分配担保
+-XX:HandlePromotionFailure
 
-### 为对象分配内存TLAB
+
+### 为对象分配内存TLAB(Thread Local Allocation Buffer)
+#### 为什么要TLAB?  
+堆区是线程共享区域,任何线程都可以访问到堆区中的共享数据。  
+对象的创建非常频繁,在并发环境下从堆区中划分内存空间是线程不安全的。
+为表面多个线程操作同一个地址,需要使用加锁机制,进而影响分配速度。
+
+#### 什么是TLAB  
+从内存模型而不是垃圾收集的角度,对Eden区域继续进行划分,JVM为每个线程分配了一个私有的缓存区域,它包含在Eden空间内。  
+多线程同时分配内存时,使用TLAB可以避免一系列的非线程安全问题,同时还能提升内存分配的吞吐量,因此我们可以将这种内存分配方式称为快速分配策略。  
+OpenJDK衍生出来的JVM都提供了TLAB的设计
+
 
 ### 小结，堆空间的参数与设置
+-XX:+PrintFlagsInitial  查看所有的参数的默认初始值  
+-XX:+PrintFlagsFinal  查看所有的参数的最终值  
+-Xms  初始堆大小(默认物理内存的1/64)  
+-Xmx  最大堆空间大小(默认物理内存的1/4)  
+-Xmn  设置新生代的大小  
+-XX:NewRatio  配置新生代与老年代在堆结构的占比  
+-XX:SurvivorRatio  配置新生代中Eden 和S0/S1空间的比例  
+-XX:MaxTenuringThreshold  设置新生代对象的最大年龄(默认15)  
+-XX:+PrintGCDetails  输出详细的GC日志  
+-XX:+PrintGC/-verbos:gc  打印简要GC信息  
+-XX:+HandlePromotionFailure  是否设置空间分配担保  
+
+#### -XX:+HandlePromotionFailure 解析
+在发生Minor GC 之前,JVM会检查老年代最大可用的连续空间是否大于新生代所有对象的空间。  
+&nbsp;&nbsp;&nbsp;&nbsp;如果大于,则此次Minor GC是安全的。  
+&nbsp;&nbsp;&nbsp;&nbsp;如果小于,则JVM会查看-XX:+HandlePromotionFailure是否允许担保失败。  
+&nbsp;&nbsp;&nbsp;&nbsp;如果-XX:+HandlePromotionFailure=true,那么会检查老年代最大可用连续空间是否大于历代晋升的平均大小  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;如果大于,则尝试Minor GC  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;如果小于,则尝试Full GC  
+&nbsp;&nbsp;&nbsp;&nbsp;如果-XX:+HandlePromotionFailure=false,则直接进行Full GC  
+在JDK6 Update24之后,-XX:+HandlePromotionFailure 不会再影响JVM的的空间分配担保策略,按-XX:+HandlePromotionFailure=true的逻辑执行。
 
 ### 堆是分配对象的唯一选择吗？
 
