@@ -70,7 +70,7 @@
 
 ​	
 
-#### 方法返回地址(Return Address/正常或者异常退出的定义)
+#### 方法返回地址(Return Address/正常或者异常退出的定义) 
 
 正常退出 存放调用该方法的指令的下一条指令的地址
 
@@ -117,11 +117,58 @@ JVM细分可划分为年轻代和老年代
 其中年轻代还可划分为Eden，Survivor0（from），Survivor1（to）区域
 
 -XX:NewRatio=2设置老年代比新生代大小为2:1 默认新生代/老年代为1/2  
--XX:SurvivorRatio=4设置Eden比S0比S1 4:1:1，默认Eden比S0比S1是8:1:1
+-XX:SurvivorRatio=4设置Eden比S0比S1 4:1:1，默认Eden比S0比S1是8:1:1  
+-Xmn100m 设置新生代的大小
 
-### 图解对象分配过程
+### 对象分配过程
+#### 对象分配的理想情况(不考虑S0,S1和Old放不下的问题)
+1,新生(new)的对象大多先分配在Eden区,此区域有大小限制  
+2,当Eden区满了而程序又要创建对象时,JVM将对Eden区域执行YGC(youngGC/Minor GC),将Eden中不再被引用的对象销毁掉  
+3.将Eden中剩余的对象移动到to区,并且将from区的对象也移动到to区,S0和S1都可以是from区或者to区每次YGC互换角色？（还未确定，视频教程感觉不是非常靠谱）
+4.再加载新的对象至Eden  
+5.将to区的对象年龄+1,当对象的年龄超过阈值之后放入老年代Old,默认阈值是15次  
+-XX:MaxTenuringThreshold=15进行设置去老年代的阈值
+#### 对象分配的特殊情况
+1.Eden满了，触发YGC  
+2.YGC:剩余的存活对象如果to区放不下，则放到老年代中。  
+如果老年代也放不下就触发FGC（FullGC）如果FGC之后还是放不下就OOM  
+3.如果超大对象大于Eden了，尝试放老年代，老年代放不下触发FullGC，还是放不下OOM
 
 ### GC
+MinorGC(YGC)、MajorGC、FullGC
+JVM在进行GC时并非每次都对新生代,老年代,方法区都进行GC,大部分的时候GC指的都是新生代  
+针对HotSpot的JVM实现,其中的GC按区域划分2大类型,一种是整体的回收Full GC,一种是部分的回收Partial GC
+#### 部分收集又分为
+##### 新生代(Young GC/Minor GC)  
+只对Eden和S0,S1进行GC
+##### 老年代(Major GC/Old GC)  
+只对老年代的GC  
+目前之后CMS GC会有单独收集老年代的行为  
+很多时候Major GC会和Full GC一起混淆使用,需要具体分辨是Old GC 还是Full GC
+##### 混合收集(Mixed GC) 
+整个新生代和部分老年代的垃圾收集,目前只有G1 GC会有这种行为
+
+##### 整堆收集
+收集整个Java堆和方法区的垃圾收集
+
+#### Minor GC 触发机制
+当年轻代不足时会触发Minor GC,指Eden不足。(Survivor 只有在GC时才会不足,对象往老年代分)  
+Minor GC频率比较高,回收速度也很快  
+
+Minor GC会引发STW(Stop the World),暂停用户线程,等垃圾回收结束,再恢复线程运行  
+
+#### Major GC 触发机制  
+指发生在老年代的GC，出现了Major GC，经常会伴随至少一次的Minor GC（非绝对，Parallel Scavenge 收集器的收集策略里就有直接进行Major GC的策略选择过程）。
+也就是说，在老年代空间不足时，会先尝试出发Minor GC，如果之后空间还不足，则出发Major GC。（感觉讲者有误，本来触发老年代GC就是因为Minor GC 过来，再触发老年代GC）  
+Major GC 的速度一般会比Minor GC 慢10倍以上，也会触发STW  
+如果Major GC 后内存还是不够创建对象，就OOM
+
+#### Full GC 触发机制
+1.调用System.gc()时，系统建议执行Full GC，但是不必然执行
+2.老年代空间不足
+3.方法区空间不足
+4.通过Minor GC后进入老年代的平均大小大于老年代的可用内存
+5.Minor GC时 对象转到老年代，对象大于老年代的可用内存（感觉和2重复了）
 
 ### 堆空间的分代思想
 
